@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Benchmarks</title>
+
+        <script src="app.js"></script>
+    </head>
+    <body>
+        <h1 id="title">ElGamal Pairs Shuffle Verification Benchmarks</h1>
+        <form>
+            #Votes (between 2 and 500):
+            <input id="field" type="number" value="2" min="2" max="500">
+            <input id="button" type="button" value="Verify Shuffle">
+            <br>
+            <input id="neff" type="radio" name="algorithm" checked> Neff
+            <input id="sato" type="radio" name="algorithm"> Sato-Kilian
+            <br>
+            <input id="parallel" type="checkbox" name="parallelism"> Parallelize
+        </form>
+        <h2>Time: <span id="time"></span></h2>
+    </body>
+</html>
