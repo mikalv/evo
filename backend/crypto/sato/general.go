@@ -10,115 +10,106 @@ import (
 	"github.com/qantik/evo/backend/crypto/elgamal"
 )
 
-type ega1 struct {
-	C1 []abstract.Point
-	C2 []abstract.Point
+type sigma1 struct {
+	U []abstract.Point
+	V []abstract.Point
 }
 
-type ega2 struct {
+type sigma2 struct {
 	Mask abstract.Scalar
 }
 
-type ega3 struct {
-	Zlambda []int
-	Zt      []abstract.Scalar
+type sigma3 struct {
+	Lambda []int
+	Gamma  []abstract.Scalar
 }
 
-type PairShuffle struct {
-	group abstract.Group
-	k     int
-	p1    ega1
-	v2    ega2
-	p3    ega3
+type Protocol struct {
+	group     abstract.Group
+	k         int
+	prover1   sigma1
+	verifier2 sigma2
+	prover3   sigma3
 }
 
-func (ps *PairShuffle) Init(group abstract.Group, k int) *PairShuffle {
-	if k <= 1 {
-		panic("Cannot shuffle permutation of size <= 1")
-	}
-
-	ps.group = group
-	ps.k = k
-	ps.p1.C1 = make([]abstract.Point, k)
-	ps.p1.C2 = make([]abstract.Point, k)
-	ps.v2.Mask = group.Scalar().Zero() // TODO
-	ps.p3.Zlambda = make([]int, k)
-	ps.p3.Zt = make([]abstract.Scalar, k)
-
-	return ps
+func (protocol *Protocol) init(group abstract.Group, k int) {
+	protocol.group = group
+	protocol.k = k
+	protocol.prover1.U = make([]abstract.Point, k)
+	protocol.prover1.V = make([]abstract.Point, k)
+	protocol.verifier2.Mask = group.Scalar().Zero() // TODO
+	protocol.prover3.Lambda = make([]int, k)
+	protocol.prover3.Gamma = make([]abstract.Scalar, k)
 }
 
-func (ps *PairShuffle) Prove(pi []int, g, w abstract.Point, beta []abstract.Scalar,
-	A1, A2 []abstract.Point, stream cipher.Stream, ctx proof.ProverContext) error {
+func (protocol *Protocol) Prove(pi []int, g, w abstract.Point, beta []abstract.Scalar,
+	A, B []abstract.Point, stream cipher.Stream, context proof.ProverContext) error {
 
-	k := ps.k
-	if k != len(pi) || k != len(beta) || k != len(A1) || k != len(A2) {
+	k := protocol.k
+	if k != len(pi) || k != len(beta) || k != len(A) || k != len(B) {
 		panic("Mismatched vector lengths.")
 	}
 
 	// P step 1
-	C1, C2, lambda, t := elgamal.Permute(ps.group, g, w, A1, A2, stream)
-	ps.p1.C1 = C1
-	ps.p1.C2 = C2
+	U, V, lambda, gamma := elgamal.Permute(protocol.group, g, w, A, B, stream)
+	protocol.prover1.U = U
+	protocol.prover1.V = V
 
-	if err := ctx.Put(ps.p1); err != nil {
+	if err := context.Put(protocol.prover1); err != nil {
 		return err
 	}
 
 	// V step 2
-	if err := ctx.PubRand(ps.v2); err != nil {
+	if err := context.PubRand(protocol.verifier2); err != nil {
 		return err
 	}
 
 	// TODO P step 3
-	ps.p3.Zlambda = lambda
-	ps.p3.Zt = t
-	if err := ctx.Put(ps.p3); err != nil {
+	protocol.prover3.Lambda = lambda
+	protocol.prover3.Gamma = gamma
+	if err := context.Put(protocol.prover3); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (ps *PairShuffle) Verify(g, w abstract.Point, A1, A2, B1, B2 []abstract.Point,
-	ctx proof.VerifierContext) error {
+func (protocol *Protocol) Verify(g, w abstract.Point, A, B, S, T []abstract.Point,
+	context proof.VerifierContext) error {
 
-	k := ps.k
-	if k != len(A1) || k != len(A2) || k != len(B1) || k != len(B2) {
+	k := protocol.k
+	if k != len(A) || k != len(B) || k != len(S) || k != len(T) {
 		panic("Mismatched vector lengths.")
 	}
 
-	// P step 1
-	if err := ctx.Get(ps.p1); err != nil {
+	if err := context.Get(protocol.prover1); err != nil {
 		return err
 	}
 
-	// V step 2
-	if err := ctx.PubRand(ps.v2); err != nil {
+	if err := context.PubRand(protocol.verifier2); err != nil {
 		return err
 	}
 
-	// V step 3
-	if err := ctx.Get(ps.p3); err != nil {
+	if err := context.Get(protocol.prover3); err != nil {
 		return err
 	}
 
 	// Verification
-	lambda := ps.p3.Zlambda
-	t := ps.p3.Zt
+	lambda := protocol.prover3.Lambda
+	gamma := protocol.prover3.Gamma
 	for i := 0; i < k; i++ {
-		V1 := ps.group.Point().Mul(g, t[lambda[i]])
-		V1.Add(V1, A1[lambda[i]])
+		alpha := protocol.group.Point().Mul(g, gamma[lambda[i]])
+		alpha.Add(alpha, A[lambda[i]])
 
-		if !V1.Equal(ps.p1.C1[i]) {
-			return errors.New("Invalid PairShuffleProof")
+		if !alpha.Equal(protocol.prover1.U[i]) {
+			return errors.New("Invalid ProtocolProof")
 		}
 
-		V2 := ps.group.Point().Mul(w, t[lambda[i]])
-		V2.Add(V2, A2[lambda[i]])
+		beta := protocol.group.Point().Mul(w, gamma[lambda[i]])
+		beta.Add(beta, B[lambda[i]])
 
-		if !V2.Equal(ps.p1.C2[i]) {
-			return errors.New("Invalid PairShuffleProof")
+		if !beta.Equal(protocol.prover1.V[i]) {
+			return errors.New("Invalid ProtocolProof")
 		}
 	}
 
@@ -126,26 +117,26 @@ func (ps *PairShuffle) Verify(g, w abstract.Point, A1, A2, B1, B2 []abstract.Poi
 }
 
 func Shuffle(group abstract.Group, g, w abstract.Point, A, B []abstract.Point,
-	stream cipher.Stream) (B1, B2 []abstract.Point, prover proof.Prover) {
+	stream cipher.Stream) (S, T []abstract.Point, prover proof.Prover) {
 
-	ps := PairShuffle{}
-	ps.Init(group, len(A))
+	protocol := Protocol{}
+	protocol.init(group, len(A))
 
-	B1, B2, pi, beta := elgamal.Permute(group, g, w, A, B, stream)
-	prover = func(ctx proof.ProverContext) error {
-		return ps.Prove(pi, g, w, beta, A, B, stream, ctx)
+	S, T, pi, beta := elgamal.Permute(group, g, w, A, B, stream)
+	prover = func(context proof.ProverContext) error {
+		return protocol.Prove(pi, g, w, beta, A, B, stream, context)
 	}
 
 	return
 }
 
 func Verifier(group abstract.Group, g, w abstract.Point,
-	A1, A2, B1, B2 []abstract.Point) proof.Verifier {
+	A, B, S, T []abstract.Point) proof.Verifier {
 
-	ps := PairShuffle{}
-	ps.Init(group, len(A1))
+	protocol := Protocol{}
+	protocol.init(group, len(A))
 
-	return func(ctx proof.VerifierContext) error {
-		return ps.Verify(g, w, A1, A2, B1, B2, ctx)
+	return func(context proof.VerifierContext) error {
+		return protocol.Verify(g, w, A, B, S, T, context)
 	}
 }
