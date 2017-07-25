@@ -42,24 +42,16 @@ func (protocol *Protocol) init(group abstract.Group, k int) {
 	protocol.prover3.Gamma = make([]abstract.Scalar, k)
 }
 
-func (protocol *Protocol) Prove(pi []int, g, w abstract.Point, beta []abstract.Scalar,
+func (protocol *Protocol) prove(pi []int, g, w abstract.Point, beta []abstract.Scalar,
 	A, B []abstract.Point, stream cipher.Stream, context proof.ProverContext) error {
 
-	k := protocol.k
-	if k != len(pi) || k != len(beta) || k != len(A) || k != len(B) {
-		panic("Mismatched vector lengths.")
-	}
-
-	// P step 1
 	U, V, lambda, gamma := elgamal.Permute(protocol.group, g, w, A, B, stream)
 	protocol.prover1.U = U
 	protocol.prover1.V = V
-
 	if err := context.Put(protocol.prover1); err != nil {
 		return err
 	}
 
-	// V step 2
 	if err := context.PubRand(protocol.verifier2); err != nil {
 		return err
 	}
@@ -74,13 +66,8 @@ func (protocol *Protocol) Prove(pi []int, g, w abstract.Point, beta []abstract.S
 	return nil
 }
 
-func (protocol *Protocol) Verify(g, w abstract.Point, A, B, S, T []abstract.Point,
+func (protocol *Protocol) verify(g, w abstract.Point, A, B, S, T []abstract.Point,
 	context proof.VerifierContext) error {
-
-	k := protocol.k
-	if k != len(A) || k != len(B) || k != len(S) || k != len(T) {
-		panic("Mismatched vector lengths.")
-	}
 
 	if err := context.Get(protocol.prover1); err != nil {
 		return err
@@ -97,19 +84,17 @@ func (protocol *Protocol) Verify(g, w abstract.Point, A, B, S, T []abstract.Poin
 	// Verification
 	lambda := protocol.prover3.Lambda
 	gamma := protocol.prover3.Gamma
-	for i := 0; i < k; i++ {
+	for i := 0; i < protocol.k; i++ {
 		alpha := protocol.group.Point().Mul(g, gamma[lambda[i]])
 		alpha.Add(alpha, A[lambda[i]])
-
 		if !alpha.Equal(protocol.prover1.U[i]) {
-			return errors.New("Invalid ProtocolProof")
+			return errors.New("Sato-Kilian: Verification failed on alpha field")
 		}
 
 		beta := protocol.group.Point().Mul(w, gamma[lambda[i]])
 		beta.Add(beta, B[lambda[i]])
-
 		if !beta.Equal(protocol.prover1.V[i]) {
-			return errors.New("Invalid ProtocolProof")
+			return errors.New("Sato-Kilian: Verification failed on beta field")
 		}
 	}
 
@@ -119,12 +104,16 @@ func (protocol *Protocol) Verify(g, w abstract.Point, A, B, S, T []abstract.Poin
 func Shuffle(group abstract.Group, g, w abstract.Point, A, B []abstract.Point,
 	stream cipher.Stream) (S, T []abstract.Point, prover proof.Prover) {
 
+	if len(A) != len(B) || len(A) <= 1 {
+		panic("Invalid vector sizes.")
+	}
+
 	protocol := Protocol{}
 	protocol.init(group, len(A))
 
 	S, T, pi, beta := elgamal.Permute(group, g, w, A, B, stream)
 	prover = func(context proof.ProverContext) error {
-		return protocol.Prove(pi, g, w, beta, A, B, stream, context)
+		return protocol.prove(pi, g, w, beta, A, B, stream, context)
 	}
 
 	return
@@ -133,10 +122,15 @@ func Shuffle(group abstract.Group, g, w abstract.Point, A, B []abstract.Point,
 func Verifier(group abstract.Group, g, w abstract.Point,
 	A, B, S, T []abstract.Point) proof.Verifier {
 
+	k := len(A)
+	if k <= 1 || k != len(B) || k != len(S) || k != len(T) {
+		panic("Invalid vector sizes.")
+	}
+
 	protocol := Protocol{}
 	protocol.init(group, len(A))
 
 	return func(context proof.VerifierContext) error {
-		return protocol.Verify(g, w, A, B, S, T, context)
+		return protocol.verify(g, w, A, B, S, T, context)
 	}
 }
