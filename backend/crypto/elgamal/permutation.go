@@ -7,7 +7,7 @@ import (
 	"github.com/dedis/kyber/random"
 )
 
-// Shuffle ElGamal pairs vectors using the Fisher-Yates algorithm.
+// Shuffle ElGamal pair vectors using the Fisher-Yates algorithm.
 // Returns permuted pair vectors, the permutation array and the blinding factors.
 func Permute(group abstract.Group, g, w abstract.Point, A, B []abstract.Point,
 	stream cipher.Stream) (S, T []abstract.Point, pi []int, beta []abstract.Scalar) {
