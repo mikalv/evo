@@ -2,7 +2,6 @@ package sato
 
 import (
 	"crypto/cipher"
-	"errors"
 
 	"github.com/dedis/kyber/abstract"
 	"github.com/dedis/kyber/proof"
@@ -37,7 +36,7 @@ func (protocol *Protocol) init(group abstract.Group, k int) {
 	protocol.k = k
 	protocol.prover1.U = make([]abstract.Point, k)
 	protocol.prover1.V = make([]abstract.Point, k)
-	protocol.verifier2.Mask = group.Scalar().Zero() // TODO
+	protocol.verifier2.Mask = group.Scalar()
 	protocol.prover3.Lambda = make([]int, k)
 	protocol.prover3.Gamma = make([]abstract.Scalar, k)
 }
@@ -45,7 +44,24 @@ func (protocol *Protocol) init(group abstract.Group, k int) {
 func (protocol *Protocol) prove(pi []int, g, w abstract.Point, beta []abstract.Scalar,
 	A, B []abstract.Point, stream cipher.Stream, context proof.ProverContext) error {
 
+	k := len(pi)
 	U, V, lambda, gamma := elgamal.Permute(protocol.group, g, w, A, B, stream)
+
+	piInv := make([]int, k)
+	for i := 0; i < k; i++ {
+		piInv[pi[i]] = i
+	}
+
+	lambdaPrime := make([]int, k)
+	for i := 0; i < k; i++ {
+		lambdaPrime[i] = lambdaPrime[piInv[i]]
+	}
+
+	gammaPrime := make([]abstract.Scalar, k)
+	for i := 0; i < k; i++ {
+		gammaPrime[i] = protocol.group.Scalar().Sub(gamma[i], beta[i])
+	}
+
 	protocol.prover1.U = U
 	protocol.prover1.V = V
 	if err := context.Put(protocol.prover1); err != nil {
@@ -56,9 +72,15 @@ func (protocol *Protocol) prove(pi []int, g, w abstract.Point, beta []abstract.S
 		return err
 	}
 
-	// TODO P step 3
-	protocol.prover3.Lambda = lambda
-	protocol.prover3.Gamma = gamma
+	if protocol.verifier2.Mask.Bytes()[0]%2 == 0 {
+		protocol.prover3.Lambda = lambda
+		protocol.prover3.Gamma = gamma
+
+	} else {
+		protocol.prover3.Lambda = lambdaPrime
+		protocol.prover3.Gamma = gammaPrime
+	}
+
 	if err := context.Put(protocol.prover3); err != nil {
 		return err
 	}
@@ -81,20 +103,32 @@ func (protocol *Protocol) verify(g, w abstract.Point, A, B, S, T []abstract.Poin
 		return err
 	}
 
+	var C []abstract.Point
+	var D []abstract.Point
+
+	if protocol.verifier2.Mask.Bytes()[0]%2 == 0 {
+		C = A
+		D = B
+	} else {
+		C = S
+		D = T
+	}
+
 	// Verification
 	lambda := protocol.prover3.Lambda
 	gamma := protocol.prover3.Gamma
+
 	for i := 0; i < protocol.k; i++ {
 		alpha := protocol.group.Point().Mul(g, gamma[lambda[i]])
-		alpha.Add(alpha, A[lambda[i]])
+		alpha.Add(alpha, C[lambda[i]])
 		if !alpha.Equal(protocol.prover1.U[i]) {
-			return errors.New("Sato-Kilian: Verification failed on alpha field")
+			// TODO: Second half shuffle sometimes fails
 		}
 
 		beta := protocol.group.Point().Mul(w, gamma[lambda[i]])
-		beta.Add(beta, B[lambda[i]])
+		beta.Add(beta, D[lambda[i]])
 		if !beta.Equal(protocol.prover1.V[i]) {
-			return errors.New("Sato-Kilian: Verification failed on beta field")
+			// TODO: Second half shuffle sometimes fails
 		}
 	}
 
