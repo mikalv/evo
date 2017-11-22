@@ -1,8 +1,8 @@
 package elgamal
 
 import (
-	"github.com/dedis/kyber/abstract"
-	"github.com/dedis/kyber/random"
+	"gopkg.in/dedis/crypto.v0/abstract"
+	"gopkg.in/dedis/crypto.v0/random"
 )
 
 // Canonical ElGamal encryption. Returning encryption pair points.

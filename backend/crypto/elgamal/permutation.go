@@ -3,8 +3,8 @@ package elgamal
 import (
 	"crypto/cipher"
 
-	"github.com/dedis/kyber/abstract"
-	"github.com/dedis/kyber/random"
+	"gopkg.in/dedis/crypto.v0/abstract"
+	"gopkg.in/dedis/crypto.v0/random"
 )
 
 // Shuffle ElGamal pair vectors using the Fisher-Yates algorithm.

@@ -4,9 +4,9 @@ import (
 	"crypto/cipher"
 	"errors"
 
-	"github.com/dedis/kyber/abstract"
-	"github.com/dedis/kyber/proof"
 	"github.com/qantik/evo/backend/crypto/elgamal"
+	"gopkg.in/dedis/crypto.v0/abstract"
+	"gopkg.in/dedis/crypto.v0/proof"
 )
 
 // P (Prover) step 1: public commitments
