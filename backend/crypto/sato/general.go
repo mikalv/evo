@@ -3,8 +3,8 @@ package sato
 import (
 	"crypto/cipher"
 
-	"github.com/dedis/kyber/abstract"
-	"github.com/dedis/kyber/proof"
+	"gopkg.in/dedis/crypto.v0/abstract"
+	"gopkg.in/dedis/crypto.v0/proof"
 
 	"github.com/qantik/evo/backend/crypto/elgamal"
 )

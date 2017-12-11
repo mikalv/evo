@@ -6,10 +6,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dedis/kyber/abstract"
-	"github.com/dedis/kyber/nist"
-	"github.com/dedis/kyber/proof"
 	"github.com/gorilla/websocket"
+	"gopkg.in/dedis/crypto.v0/abstract"
+	"gopkg.in/dedis/crypto.v0/nist"
+	"gopkg.in/dedis/crypto.v0/proof"
 
 	"github.com/qantik/evo/backend/crypto/elgamal"
 	"github.com/qantik/evo/backend/crypto/neff"
